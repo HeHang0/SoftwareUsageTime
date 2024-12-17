@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Timers;
 using System.Diagnostics;
 using System.Collections.Concurrent;
+using System.Text;
 
 namespace PicaPico
 {
@@ -20,6 +21,12 @@ namespace PicaPico
 
         [DllImport("psapi.dll", SetLastError = true)]
         static extern uint GetModuleBaseName(IntPtr hProcess, IntPtr hModule, [Out] char[] lpBaseName, uint nSize);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool QueryFullProcessImageName(IntPtr hProcess, int dwFlags, StringBuilder lpExeName, ref uint lpdwSize);
+
+        [DllImport("kernel32.dll")]
+        static extern bool CloseHandle(IntPtr hObject);
 
 
         private Dictionary<string, int> softwareUsage = new Dictionary<string, int>();
@@ -103,16 +110,21 @@ namespace PicaPico
             }
             IntPtr processHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, processId);
             if (processHandle == IntPtr.Zero) return null;
-
-            char[] processName = new char[1024];
-            GetModuleBaseName(processHandle, IntPtr.Zero, processName, (uint)processName.Length);
-            var processText = new string(processName).Trim('\0');
-
-            lock (lockObj)
+            try
             {
-                processNameCache[hwnd] = processText;
+                StringBuilder exePath = new StringBuilder(4096);
+                uint size = (uint)exePath.Capacity;
+
+                if (QueryFullProcessImageName(processHandle, 0, exePath, ref size))
+                {
+                    return exePath.ToString();
+                }
             }
-            return processText;
+            finally
+            {
+                CloseHandle(processHandle);
+            }
+            return null;
         }
     }
 }
