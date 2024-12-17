@@ -1,0 +1,29 @@
+name: .NET Library
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v2
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install dependencies
+        run: dotnet restore SoftwareUsageTime.csproj
+
+      - name: Build
+        run: dotnet build SoftwareUsageTime.csproj --configuration Release --no-restore
+
+      - name: Pack
+        run: dotnet pack SoftwareUsageTime.csproj -c Release --no-build -o out
+
+      - name: Push NuGet package
+        run: dotnet nuget push "out\*.nupkg" -k ${{secrets.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate
